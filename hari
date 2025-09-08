@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login (Client + Backend-ready)</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#60a5fa;--muted:#94a3b8}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#071129 0%,#082033 100%);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .card{width:360px;padding:28px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.7);border:1px solid rgba(255,255,255,0.03)}
+    h1{margin:0 0 8px;font-size:20px;color:#e6eef8}
+    p.lead{margin:0 0 18px;color:var(--muted);font-size:13px}
+    label{display:block;font-size:13px;color:#cbd5e1;margin-bottom:6px}
+    input[type=text],input[type=password]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef8;font-size:14px}
+    .field{margin-bottom:12px}
+    .row{display:flex;gap:8px;align-items:center}
+    .remember{font-size:13px;color:var(--muted)}
+    button{width:100%;padding:10px 12px;border:0;border-radius:10px;background:linear-gradient(90deg,var(--accent),#3b82f6);color:white;font-weight:600;cursor:pointer}
+    .error{color:#ffb4b4;background:rgba(255,80,80,0.06);padding:8px;border-radius:8px;font-size:13px;margin-bottom:10px}
+    .success{color:#b7f5c6;background:rgba(30,200,120,0.06);padding:8px;border-radius:8px;font-size:13px;margin-bottom:10px}
+    .note{font-size:12px;color:var(--muted);margin-top:12px}
+    .footer{margin-top:14px;text-align:center;font-size:12px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted)}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.12);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Sign in to your account</h1>
+    <p class="lead">Enter your credentials. This form validates on the client and shows how to connect to a backend.</p>
+
+    <div id="message" aria-live="polite"></div>
+
+    <form id="loginForm" novalidate>
+      <div class="field">
+        <label for="username">Username or email</label>
+        <input id="username" name="username" type="text" autocomplete="username" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" />
+      </div>
+
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+        <label class="remember"><input id="remember" name="remember" type="checkbox" /> Remember me</label>
+        <a href="#" class="small">Forgot?</a>
+      </div>
+
+      <button id="submitBtn" type="submit">Sign in</button>
+
+      <p class="note">Tip: without a backend the page uses a mock check (admin / Password123). Replace the mock with a real fetch() POST to your server to validate credentials securely.</p>
+      <div class="footer">Built with plain HTML/CSS/JS — secure backend recommended</div>
+    </form>
+  </main>
+
+  <script>
+    // Helper: show messages
+    const messageEl = document.getElementById('message');
+    function showError(text){ messageEl.innerHTML = `<div class="error">${text}</div>` }
+    function showSuccess(text){ messageEl.innerHTML = `<div class="success">${text}</div>` }
+    function clearMessage(){ messageEl.innerHTML = '' }
+
+    const form = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Client-side validation rules
+    function validateFields(username, password){
+      if(!username || username.trim().length === 0) return 'Please enter your username or email.';
+      if(!password || password.length < 8) return 'Password must be at least 8 characters.';
+      // Example password policy: must contain a number
+      if(!/\d/.test(password)) return 'Password must include at least one digit.';
+      return null;
+    }
+
+    // Simulated backend call (for demo). Set useMock=false to attempt a real fetch to /api/login
+    const useMock = true;
+
+    async function callBackend(username, password){
+      if(useMock){
+        // Simulate network delay
+        await new Promise(r=>setTimeout(r,700));
+        // For demo only: valid credentials are admin / Password123
+        if(username === 'admin' && password === 'Password123'){
+          return { ok: true, token: 'fake-jwt-token', message: 'Login successful (mock).' };
+        }
+        return { ok: false, status:401, message: 'Invalid username or password (mock).' };
+      }
+
+      // Real backend example: replace URL with your server endpoint
+      const url = '/api/login';
+      try{
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        if(!res.ok){
+          const err = await res.json().catch(()=>({message:'Login failed'}));
+          return { ok: false, status: res.status, message: err.message || 'Login failed' };
+        }
+        const data = await res.json();
+        // expected: { token: '...', user: {...} }
+        return { ok: true, ...data };
+      }catch(e){
+        return { ok:false, message: e.message || 'Network error' };
+      }
+    }
+
+    form.addEventListener('submit', async (e) =>{
+      e.preventDefault();
+      clearMessage();
+
+      const username = form.username.value;
+      const password = form.password.value;
+
+      const vErr = validateFields(username, password);
+      if(vErr){ showError(vErr); return }
+
+      // show loading
+      const oldText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span class="spinner"></span> Signing in...`;
+
+      const result = await callBackend(username, password);
+
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = oldText;
+
+      if(result.ok){
+        showSuccess(result.message || 'Signed in');
+        // Persist token securely (example uses localStorage for demo; use secure httpOnly cookie in production)
+        if(result.token){ localStorage.setItem('authToken', result.token) }
+        // Redirect or update UI
+        // window.location.href = '/dashboard';
+      } else {
+        if(result.status === 401) showError('Invalid credentials.');
+        else showError(result.message || 'Login failed.');
+      }
+    });
+
+    // Optional: live validation on blur
+    form.username.addEventListener('blur', ()=>{
+      const msg = validateFields(form.username.value, form.password.value);
+      if(msg) showError(msg); else clearMessage();
+    });
+
+  </script>
+</body>
+</html>
